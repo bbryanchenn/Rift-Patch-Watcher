@@ -15,3 +15,7 @@ Add a repository secret:
 DISCORD_WEBHOOK_URL
 
 Then enable GitHub Actions.
+
+## Status
+
+![status](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge)
