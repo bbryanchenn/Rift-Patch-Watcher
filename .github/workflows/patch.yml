@@ -2,7 +2,7 @@ name: Rift Patch Watcher
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # runs once per day
+    - cron: "0 12 * * *"   # runs once per day
   workflow_dispatch:
 
 jobs:
