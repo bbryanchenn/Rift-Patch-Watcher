@@ -22,7 +22,12 @@ path = first_match(json.loads(nx))
 patch = path if path.startswith("http") else "https://www.leagueoflegends.com" + (path if path.startswith("/") else "/" + path)
 
 page = requests.get(patch, headers=UA, timeout=30).text
-img_url = re.search(r'https://cmsassets\.rgpub\.io/sanity/images/[^"]*1920x1080\.png', page).group(0)
+imgs = re.findall(r'https://cmsassets\.rgpub\.io/sanity/images/[^"]+\.(png|jpg)', page)
+
+if not imgs:
+    raise RuntimeError("No images found on page")
+
+img_url = imgs[1][0] if isinstance(imgs[0], tuple) else imgs[1] if len(imgs) > 1 else imgs[0]
 
 STATE = "state.json"
 
