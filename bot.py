@@ -1,7 +1,6 @@
 import os, re, json, requests
 
-# WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
-WEBHOOK = "https://discord.com/api/webhooks/1478633006846443531/dj64vSn2kuPrEwWjMQezKRtlEJXqWLiCV-mFw1tfnmpBET55DIBNvxa7q4W3zpAOoI1p"
+WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
 UA = {"User-Agent": "patch-webhook/1.0"}
 
 def first_match(o):
