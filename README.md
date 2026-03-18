@@ -2,6 +2,9 @@
 
 Automatically posts League of Legends patch highlights to a Discord channel through discord webhook.
 
+## Status
+![status](https://github.com/bbryanchenn/rift-patch-watcher/actions/workflows/patch_v2.yml/badge.svg?style=for-the-badge)
+
 ## Features
 - Detects new Riot patch notes
 - Extracts Patch Highlights image
@@ -16,6 +19,3 @@ DISCORD_WEBHOOK_URL
 
 Then enable GitHub Actions.
 
-## Status
-
-![status](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge)
