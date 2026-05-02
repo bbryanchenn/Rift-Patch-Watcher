@@ -24,7 +24,8 @@ jobs:
 
       - name: run bot
         env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PATCH_WEBHOOK: ${{ secrets.PATCH_WEBHOOK }}
+          BANNER_WEBHOOK: ${{ secrets.BANNER_WEBHOOK }}
         run: python bot.py
 
       - name: save state
