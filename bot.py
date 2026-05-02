@@ -1,55 +1,153 @@
 import os, re, json, requests
 
-WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
+PATCH_WEBHOOK = os.environ["PATCH_WEBHOOK"] 
+BANNER_WEBHOOK = os.environ["BANNER_WEBHOOK"]
+
+if not PATCH_WEBHOOK or not BANNER_WEBHOOK:
+    raise SystemExit("Missing PATCH_WEBHOOK or BANNER_WEBHOOK env var")
+
+
 UA = {"User-Agent": "patch-webhook/1.0"}
+STATE = "state.json"
+BASE = "https://www.leagueoflegends.com"
 
-def first_match(o):
-    if isinstance(o, str) and "league-of-legends-patch-" in o and "-notes" in o:
-        return o
-    if isinstance(o, dict):
-        for v in o.values():
-            m = first_match(v)
-            if m: return m
-    if isinstance(o, list):
-        for v in o:
-            m = first_match(v)
-            if m: return m
 
-tags = requests.get("https://www.leagueoflegends.com/en-us/news/tags/patch-notes/", headers=UA, timeout=30).text
-nx = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', tags, re.S).group(1)
-path = first_match(json.loads(nx))
+def first_match(obj):
+    if isinstance(obj, str) and "league-of-legends-patch-" in obj and "-notes" in obj:
+        return obj
 
-patch = path if path.startswith("http") else "https://www.leagueoflegends.com" + (path if path.startswith("/") else "/" + path)
-page = requests.get(patch, headers=UA, timeout=30).text
+    if isinstance(obj, dict):
+        for val in obj.values():
+            found = first_match(val)
+            if found:
+                return found
 
-m = re.search(
+    if isinstance(obj, list):
+        for val in obj:
+            found = first_match(val)
+            if found:
+                return found
+
+    return None
+
+
+def load_state():
+    if os.path.exists(STATE):
+        with open(STATE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_state(state):
+    with open(STATE, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+
+
+def full_url(url):
+    if not url:
+        return None
+
+    url = url.replace("&amp;", "&")
+
+    if url.startswith("data:image"):
+        return None
+
+    if url.startswith("//"):
+        return "https:" + url
+
+    if url.startswith("/"):
+        return BASE + url
+
+    if url.startswith("http"):
+        return url
+
+    return None
+
+
+def send_image(webhook, img_url, filename):
+    img = requests.get(img_url, headers=UA, timeout=30)
+    img.raise_for_status()
+
+    r = requests.post(
+        webhook,
+        files={"file": (filename, img.content, "image/png")},
+        timeout=30
+    )
+
+    print("discord status:", r.status_code, r.text)
+    r.raise_for_status()
+
+
+tags_url = BASE + "/en-us/news/tags/patch-notes/"
+tags = requests.get(tags_url, headers=UA, timeout=30).text
+
+next_data_match = re.search(
+    r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+    tags,
+    re.S
+)
+
+if not next_data_match:
+    raise SystemExit("Could not find NEXT_DATA")
+
+path = first_match(json.loads(next_data_match.group(1)))
+
+if not path:
+    raise SystemExit("Could not find latest patch path")
+
+patch_url = full_url(path)
+
+if not patch_url:
+    raise SystemExit("Could not build patch URL")
+
+page = requests.get(patch_url, headers=UA, timeout=30).text
+
+highlight_match = re.search(
     r'Patch Highlights.*?(https://cmsassets\.rgpub\.io/sanity/images/[^"]+\.(?:png|jpg|jpeg|webp))',
     page,
     re.S
 )
 
-if not m:
-    print("Patch Highlights image not found")
-    exit()
+if not highlight_match:
+    raise SystemExit("Patch Highlights image not found")
 
-img_url = m.group(1)
-print(f"Found patch {patch} with highlights image {img_url}")
+img_url = highlight_match.group(1)
 
-STATE = "state.json"
-last = ""
-if os.path.exists(STATE):
-    last = json.load(open(STATE)).get("patch", "")
+banner_match = re.search(
+    r'<meta property="og:image" content="([^"]+)"',
+    page
+)
 
-if patch != last:
-    print("sending to webhook")
-    img = requests.get(img_url, headers=UA, timeout=30)
-    img.raise_for_status()
+banner_url = full_url(banner_match.group(1)) if banner_match else None
 
-    r = requests.post(WEBHOOK, files={"file": ("patch_highlights.png", img.content, "image/jpeg")}, timeout=30)
-    print("discord status:", r.status_code, r.text)
-    r.raise_for_status()
+print(f"Found patch: {patch_url}")
+print(f"Found highlights image: {img_url}")
+print(f"Found banner image: {banner_url}" if banner_url else "Banner image not found")
 
-    json.dump({"patch": patch}, open(STATE, "w"))
-    print("state updated")
+state = load_state()
+last_patch = state.get("patch", "")
+
+if patch_url != last_patch:
+    print("new patch found, sending highlights")
+
+    send_image(PATCH_WEBHOOK, img_url, "patch_highlights.png")
+
+    if banner_url:
+        print("sending banner")
+        send_image(BANNER_WEBHOOK, banner_url, "patch_banner.png")
+        
+        requests.post(
+            BANNER_WEBHOOK,
+            json={"content": f"RIFT_BANNER_COMMIT__Q7xN2vLm9TpR4kZ8"},
+            timeout=30
+        ).raise_for_status()
+        
+    else:
+        print("no banner found, skipping banner send")
+
+    state["patch"] = patch_url
 else:
-    print("no new patch, skipping send")
+    print("no new patch, skipping highlights and banner")
+
+save_state(state)
+print("state updated")
